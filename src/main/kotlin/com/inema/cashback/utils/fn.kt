@@ -47,11 +47,12 @@ infix fun <X, Y, Z> Function1<X, Either<Y, Z>>.thenAssure(assured: Assured<Y, Z>
     }
 }
 
+@Suppress("UNCHECKED_CAST")
 infix fun <X, Y, Z, R> Function1<X, Either<Y, Z>>.thenMapResult(fn: (Z) -> R): (X) -> Either<Y, R> = {
     this(it).let { e ->
         e.map(
                 ifResult = { z -> Either.Result(fn(z)) },
-                ifError = { _ -> e as Either<Y, R> }
+                ifError = {  e as Either<Y, R> }
         )
     }
 }
@@ -70,6 +71,10 @@ data class Assured<T, V>(
         val or: (V) -> T
 )
 
+fun <FORM> assure(criteria: (FORM) -> Boolean, orElse: (FORM) -> CashBackError): (FORM) -> Either<CashBackError, FORM> =
+        assure { Assured(criteria, orElse) }
+
+
 fun <ERROR, FORM> assure(a: () -> Assured<ERROR, FORM>): (FORM) -> Either<ERROR, FORM> = {
     a().let { assured ->
         if (assured.fn(it)) {
@@ -86,4 +91,22 @@ infix fun <ERROR, FORM> Function1<FORM, Boolean>.orElse(fn: (FORM) -> ERROR): As
         or = fn
 )
 
+
+fun <P, R> Function1<P, R>.fromDb(): (P) -> Either<CashBackError, R> = {
+    runCatching {
+        Right(this.invoke(it))
+    }.getOrElse { e ->
+        Left(persistenceError(e.message))
+    }
+}
+
+fun <P, R> Function1<P, R>.intoDb(): (P) -> Either<CashBackError, R> = this.fromDb()
+
+fun <P, R> Function1<P, R>.onDb(): (P) -> Either<CashBackError, R> =
+        this.fromDb()
+
+infix fun <T> Function1<T, Unit>.and(fn: (T) -> Unit): (T) -> Unit = {
+    this(it)
+    fn(it)
+}
 

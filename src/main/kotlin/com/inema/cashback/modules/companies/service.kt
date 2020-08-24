@@ -1,10 +1,10 @@
 package com.inema.cashback.modules.companies
 
+import com.inema.cashback.modules.companies.CreateCompanyForm.Companion.noCompanyWithSameName
+import com.inema.cashback.modules.companies.CreateCompanyForm.Companion.ownerExist
+import com.inema.cashback.modules.companies.UpdateCompanyForm.Companion.companyExist
 import com.inema.cashback.modules.security.authz.UserPermissions
-import com.inema.cashback.modules.users.Users
-import com.inema.cashback.modules.users.eqIgnoreCase
 import com.inema.cashback.utils.*
-import org.hibernate.validator.constraints.Length
 import org.jetbrains.exposed.sql.*
 import org.springframework.context.ApplicationEvent
 import org.springframework.context.ApplicationEventPublisher
@@ -14,84 +14,92 @@ import org.springframework.transaction.annotation.Transactional
 import org.springframework.validation.SmartValidator
 import java.util.*
 
-/**
- * Create Company Form
- *
- * TODO: add other fields
- */
-data class CreateCompanyForm(@field:Length(min = 8, max = 100, message = "name.length.message") val name: String, val owner: String)
-
-/**
- * Company entity events
- */
-sealed class CompanyEvent(data: Map<String, Any>) : ApplicationEvent(data), Map<String, Any> by data {
-    class CompanyCreated(data: Map<String, Any>) : CompanyEvent(data)
-    class CompanyDeleted(data: Map<String, Any>) : CompanyEvent(data)
+sealed class CompanyEvent(data: Map<String, *>) : ApplicationEvent(data), Map<String, Any?> by data {
+    class CompanyCreated(data: Map<String, *>) : CompanyEvent(data)
+    class CompanyDeleted(data: Map<String, *>) : CompanyEvent(data)
+    class CompanyUpdated(data: Map<String, *>) : CompanyEvent(data)
 }
 
 
 @Service
-class CompaniesService(val eventBus: ApplicationEventPublisher, val validator: SmartValidator) {
+class CompanyMutationService(
+        eventBus: ApplicationEventPublisher,
+        validator: SmartValidator
+) : MutationService(validator, eventBus) {
 
-    val deleteCompany: (UUID) -> Either<CashBackError, Map<String, Any>> = { id ->
-        runCatching {
-            Companies.deleteWhere {
-                Companies.id eq id
-            }.let { Right(mapOf("id" to id)) }
-        }.getOrElse { Left(persistenceError(it.message)) }
-    }
-    val insertCompany: (CreateCompanyForm) -> Either<CashBackError, Map<String, Any>> = { form ->
-        runCatching {
-            Companies.insertAndGetId { it[name] = form.name;it[owner] = form.owner }
-        }.map {
-            Right(mapOf("id" to it.value, "name" to form.name, "owner" to form.owner))
-        }.getOrElse {
-            Left(persistenceError(it.message
-                    ?: ""))
+    val insert = { form: CreateCompanyForm ->
+        Companies.insertAndGetId {
+            it[name] = form.name
+            it[owner] = form.owner
+            it[displayName] = form.displayName ?: form.name
+            it[address] = form.address
+            it[website] = form.website
+            it[description] = form.description
+            it[picture] = form.picture
+        }.let {
+            form.asMap() + ("id" to it.value)
         }
     }
-    val addOwnerPermissions: (Map<String, Any>) -> Unit = { evt ->
+    val update = { form: UpdateCompanyForm ->
+        Companies.update(where = { Companies.id eq form.id }) {
+            it[displayName] = form.displayName
+            it[website] = form.website
+            it[address] = form.address
+            it[picture] = form.picture
+            it[description] = form.description
+        }
+        form.asMap()
+    }
+    val delete = { id: UUID ->
+        Companies.deleteWhere {
+            Companies.id eq id
+        }.let { mapOf("id" to id) }
+    }
+    val addOwnerPermissions = { evt: Map<String, *> ->
         val id = evt["id"] as UUID
         val owner = evt["owner"] as String
         UserPermissions.addPermission(owner, "owner", "company", id.toString())
     }
-    val deleteCompanyPermissions: (UUID) -> Unit = {
-        UserPermissions.removeByEntityId(it.toString())
+    val deleteCompanyPermissions = { id: UUID ->
+        UserPermissions.removeByEntityId(id.toString())
     }
 
     @Transactional
     fun createCompany(form: CreateCompanyForm) = let {
-        val validateForm = validator.forForm<CreateCompanyForm>()
-        val assureOwnerExist = assure {
-            { form: CreateCompanyForm ->
-                Users.findByUsernameOrEmail(form.owner).count() > 0L
-            } orElse {
-                missingKey("there is no owner with username: ${it.owner}")
-            }
-        }
-        val assureNoCompanyWithSameName = assure {
-            { form: CreateCompanyForm ->
-                Companies.select { Companies.name eqIgnoreCase form.name }.count() == 0L
-            } orElse { uniqueConstraint("company with name ${it.name} already exist ") }
-        }
 
-        form.run(validateForm then
-                assureOwnerExist then
-                assureNoCompanyWithSameName then
-                insertCompany andOnResult
-                {
-                    addOwnerPermissions(it)
-                    eventBus.publishEvent(CompanyEvent.CompanyCreated(it))
+        val pipeline = validate<CreateCompanyForm>() then assure(
+                ownerExist,
+                orElse = { missingKey("there is no owner with username: ${it.owner}") }
+        ) then assure(
+                noCompanyWithSameName,
+                orElse = { uniqueConstraint("company with name ${it.name} already exist ") }
+        ) then insert.intoDb() andOnResult (addOwnerPermissions and emit(CompanyEvent::CompanyCreated))
+        pipeline(form)
+    }
+
+
+    @Transactional
+    fun deleteCompany(id: UUID) = let {
+        val pipeline = delete.fromDb() andOnResult
+                (emit(CompanyEvent::CompanyDeleted) and {
+                    deleteCompanyPermissions(it["id"] as UUID)
                 })
-
+        pipeline(id)
     }
 
     @Transactional
-    fun deleteCompany(id: UUID) =
-            (deleteCompany andOnResult {
-                deleteCompanyPermissions(it["id"] as UUID)
-                eventBus.publishEvent(CompanyEvent.CompanyDeleted(it))
-            })(id)
+    fun updateCompany(id: UUID, form: UpdateCompanyForm) = let {
+        val pipeline = validate<UpdateCompanyForm>() thenMapResult
+                { it.copy(id = id) } then
+                assure(
+                        companyExist,
+                        orElse = { missingKey("no such company with id ${it.id}") }
+                ) then update.onDb() andOnResult
+                emit(CompanyEvent::CompanyUpdated)
+
+        pipeline(form)
+    }
 }
+
 
 

@@ -11,27 +11,36 @@ import java.util.*
 
 @RestController
 @RequestMapping("api/v1.0/companies")
-class CompaniesController(val companies: CompaniesService) : BaseController {
-
-    @PostMapping
+class CompaniesController(val companies: CompanyMutationService) : BaseController {
+    @PostMapping("")
     fun createCompany(@RequestBody form: CreateCompanyForm) = companies.createCompany(form).response()
+
+    @DeleteMapping("/{id}")
+    fun deleteCompany(@PathVariable id: UUID) = companies.deleteCompany(id).response()
+
+    @PutMapping("/{id}")
+    fun updateCompany(@PathVariable id: UUID, form: UpdateCompanyForm) = companies.updateCompany(id, form).response()
 
     @GetMapping("/{id}")
     fun getCompany(@PathVariable id: UUID) = transaction {
         Users.innerJoin(Companies).select {
             Companies.id eq id
-        }.map {
-            ok(mapOf(
-                    "id" to it[Companies.id].value,
-                    "name" to it[Companies.name],
-                    "owner" to mapOf(
-                            "username" to it[Users.id],
-                            "email" to it[Users.email]
-                    )
-            ))
+        }.map { result ->
+            ok(result.selectFrom(Companies) { it ->
+                mapOf(
+                        "id" to it[this.id].value,
+                        "displayName" to it[displayName],
+                        "picture" to it[picture],
+                        "address" to it[address],
+                        "description" to it[description],
+                        "name" to it[name],
+                        "website" to it[website],
+                        "owner" to it.selectFrom(Users) {
+                            mapOf("username" to it[this.id], "email" to it[email])
+                        }
+                )
+            })
         }.firstOrNull() ?: notFound().build()
     }
 
-    @DeleteMapping("/{id}")
-    fun deleteCompany(@PathVariable id: UUID) = companies.deleteCompany(id).response()
 }

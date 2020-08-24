@@ -30,18 +30,6 @@ fun Errors.collectErrors(): List<FormError> =
         }
 
 
-inline fun <reified T : Any> SmartValidator.forForm(): (T) -> Either<CashBackError, T> = { form ->
-    BindException(form, form::javaClass.name).let {
-        validate(form, it)
-        if (it.hasErrors()) {
-            Left(formErrors(it.collectErrors()))
-        } else {
-            Right(form)
-        }
-    }
-}
-
-
 fun cashbackError(error: String, message: String?, errors: List<FormError> = emptyList()) = CashBackError(error, message
         ?: "", errors)
 
