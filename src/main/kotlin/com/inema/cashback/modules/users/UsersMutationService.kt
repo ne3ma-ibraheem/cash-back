@@ -1,30 +1,18 @@
 package com.inema.cashback.modules.users
 
-import com.inema.cashback.modules.users.RegistrationForm.Companion.noUserWithSameNameOrEmail
+import com.inema.cashback.modules.users.forms.RegistrationForm
+import com.inema.cashback.modules.users.forms.RegistrationForm.Companion.noUserWithSameNameOrEmail
 import com.inema.cashback.utils.*
 import org.jetbrains.exposed.sql.insert
-import org.springframework.context.ApplicationEvent
-import org.springframework.context.ApplicationEventPublisher
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import org.springframework.validation.SmartValidator
-
-
-sealed class UserEvents(val user: User) : ApplicationEvent(user) {
-    class UserCreated(user: User) : UserEvents(user)
-}
-
 
 @Service
-class UserMutationService(
-        validator: SmartValidator,
-        eventBus: ApplicationEventPublisher,
-        val passwordEncoder: PasswordEncoder
-) : MutationService(validator, eventBus) {
+class UsersMutationService(val passwordEncoder: PasswordEncoder) : MutationService() {
 
     val insert = { form: RegistrationForm ->
-        Users.insert {
+        UsersTable.insert {
             it[id] = form.username
             it[email] = form.email
             it[password] = form.password

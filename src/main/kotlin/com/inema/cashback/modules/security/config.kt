@@ -1,7 +1,7 @@
 package com.inema.cashback.modules.security
 
 import com.inema.cashback.modules.security.authn.CashbackDetailsService
-import com.inema.cashback.modules.security.authz.UserPermissions
+import com.inema.cashback.modules.security.authz.UserPermissionsTable
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.select
 import org.springframework.context.annotation.Bean
@@ -66,10 +66,10 @@ class CashbackSecurityConfig : WebSecurityConfigurerAdapter() {
 
 class HasPermissionEvaluator : PermissionEvaluator {
     override fun hasPermission(auth: Authentication, target: Any, permission: Any): Boolean =
-            UserPermissions.select {
-                (UserPermissions.sid eq auth.name)
-                        .and(UserPermissions.target eq target.toString())
-                        .and(UserPermissions.permission eq permission.toString())
+            UserPermissionsTable.select {
+                (UserPermissionsTable.sid eq auth.name)
+                        .and(UserPermissionsTable.target eq target.toString())
+                        .and(UserPermissionsTable.permission eq permission.toString())
             }.count() > 0L
 
 
@@ -78,10 +78,10 @@ class HasPermissionEvaluator : PermissionEvaluator {
                                entity: String,
                                permission: Any
     ): Boolean =
-            UserPermissions.select {
-                (UserPermissions.sid eq auth.name)
-                        .and(UserPermissions.targetId eq id.toString())
-                        .and(UserPermissions.target eq entity)
-                        .and(UserPermissions.permission eq permission.toString())
+            UserPermissionsTable.select {
+                (UserPermissionsTable.sid eq auth.name)
+                        .and(UserPermissionsTable.targetId eq id.toString())
+                        .and(UserPermissionsTable.target eq entity)
+                        .and(UserPermissionsTable.permission eq permission.toString())
             }.count() > 0L
 }

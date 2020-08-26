@@ -1,7 +1,9 @@
 package com.inema.cashback.modules.companies
 
 
-import com.inema.cashback.modules.users.Users
+import com.inema.cashback.modules.companies.forms.CreateCompanyForm
+import com.inema.cashback.modules.companies.forms.UpdateCompanyForm
+import com.inema.cashback.modules.users.UsersTable
 import com.inema.cashback.utils.BaseController
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -11,7 +13,7 @@ import java.util.*
 
 @RestController
 @RequestMapping("api/v1.0/companies")
-class CompaniesController(val companies: CompanyMutationService) : BaseController {
+class CompaniesController(val companies: CompaniesMutationService) : BaseController {
     @PostMapping("")
     fun createCompany(@RequestBody form: CreateCompanyForm) = companies.createCompany(form).response()
 
@@ -19,14 +21,14 @@ class CompaniesController(val companies: CompanyMutationService) : BaseControlle
     fun deleteCompany(@PathVariable id: UUID) = companies.deleteCompany(id).response()
 
     @PutMapping("/{id}")
-    fun updateCompany(@PathVariable id: UUID, form: UpdateCompanyForm) = companies.updateCompany(id, form).response()
+    fun updateCompany(@PathVariable id: UUID, @RequestBody form: UpdateCompanyForm) = companies.updateCompany(id, form).response()
 
     @GetMapping("/{id}")
     fun getCompany(@PathVariable id: UUID) = transaction {
-        Users.innerJoin(Companies).select {
-            Companies.id eq id
+        UsersTable.innerJoin(CompaniesTable).select {
+            CompaniesTable.id eq id
         }.map { result ->
-            ok(result.selectFrom(Companies) { it ->
+            ok(result.selectFrom(CompaniesTable) { it ->
                 mapOf(
                         "id" to it[this.id].value,
                         "displayName" to it[displayName],
@@ -35,7 +37,7 @@ class CompaniesController(val companies: CompanyMutationService) : BaseControlle
                         "description" to it[description],
                         "name" to it[name],
                         "website" to it[website],
-                        "owner" to it.selectFrom(Users) {
+                        "owner" to it.selectFrom(UsersTable) {
                             mapOf("username" to it[this.id], "email" to it[email])
                         }
                 )

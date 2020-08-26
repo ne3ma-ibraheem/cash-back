@@ -63,10 +63,10 @@
             <groupId>com.fasterxml.jackson.module</groupId>
             <artifactId>jackson-module-kotlin</artifactId>
         </dependency>
-        <!--        <dependency>-->
-        <!--            <groupId>org.flywaydb</groupId>-->
-        <!--            <artifactId>flyway-core</artifactId>-->
-        <!--        </dependency>-->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.jetbrains.kotlin</groupId>
             <artifactId>kotlin-reflect</artifactId>
@@ -134,6 +134,29 @@
                 </dependencies>
             </plugin>
         </plugins>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+            </resource>
+        </resources>
     </build>
+
+    <profiles>
+        <profile>
+            <id>in-memory</id>
+            <activation><activeByDefault>true</activeByDefault></activation>
+            <properties><active.profile>in-memory</active.profile></properties>
+        </profile>
+        <profile>
+            <id>development</id>
+            <properties><active.profile>development</active.profile></properties>
+        </profile>
+        <profile>
+            <id>test</id>
+            <properties><active.profile>test</active.profile></properties>
+        </profile>
+
+    </profiles>
 
 </project>

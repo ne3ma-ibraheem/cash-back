@@ -1,14 +1,19 @@
 package com.inema.cashback.utils
 
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.context.ApplicationEvent
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.validation.BindException
 import org.springframework.validation.SmartValidator
 
-abstract class MutationService(
-        val validator: SmartValidator,
-        val eventBus: ApplicationEventPublisher
-) {
+abstract class MutationService {
+
+    @Autowired
+    lateinit var validator: SmartValidator
+
+    @Autowired
+    lateinit var eventBus: ApplicationEventPublisher
+
     inline fun <reified T : Any> validate() = { form: T ->
         BindException(form, form::javaClass.name).let {
             validator.validate(form, it)

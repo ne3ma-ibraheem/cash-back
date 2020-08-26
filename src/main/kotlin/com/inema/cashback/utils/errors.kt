@@ -38,5 +38,6 @@ fun formErrors(errors: List<FormError>) = cashbackError("form validation", "form
 fun uniqueConstraint(message: String?) = cashbackError("unique constraint", message)
 
 fun missingKey(message: String?) = cashbackError("missing key", message)
+fun limitReached(message: String?) = cashbackError("limit reached", message)
 
 fun persistenceError(message: String?) = cashbackError("transaction error", message)

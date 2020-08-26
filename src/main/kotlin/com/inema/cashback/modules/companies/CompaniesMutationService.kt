@@ -1,34 +1,22 @@
 package com.inema.cashback.modules.companies
 
-import com.inema.cashback.modules.companies.CreateCompanyForm.Companion.noCompanyWithSameName
-import com.inema.cashback.modules.companies.CreateCompanyForm.Companion.ownerExist
-import com.inema.cashback.modules.companies.UpdateCompanyForm.Companion.companyExist
-import com.inema.cashback.modules.security.authz.UserPermissions
+import com.inema.cashback.modules.companies.forms.CreateCompanyForm.Companion.noCompanyWithSameName
+import com.inema.cashback.modules.companies.forms.CreateCompanyForm.Companion.ownerExist
+import com.inema.cashback.modules.companies.forms.UpdateCompanyForm.Companion.companyExist
+import com.inema.cashback.modules.companies.forms.CreateCompanyForm
+import com.inema.cashback.modules.companies.forms.UpdateCompanyForm
+import com.inema.cashback.modules.security.authz.UserPermissionsTable
 import com.inema.cashback.utils.*
 import org.jetbrains.exposed.sql.*
-import org.springframework.context.ApplicationEvent
-import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-
-import org.springframework.validation.SmartValidator
 import java.util.*
 
-sealed class CompanyEvent(data: Map<String, *>) : ApplicationEvent(data), Map<String, Any?> by data {
-    class CompanyCreated(data: Map<String, *>) : CompanyEvent(data)
-    class CompanyDeleted(data: Map<String, *>) : CompanyEvent(data)
-    class CompanyUpdated(data: Map<String, *>) : CompanyEvent(data)
-}
-
-
 @Service
-class CompanyMutationService(
-        eventBus: ApplicationEventPublisher,
-        validator: SmartValidator
-) : MutationService(validator, eventBus) {
+class CompaniesMutationService() : MutationService() {
 
     val insert = { form: CreateCompanyForm ->
-        Companies.insertAndGetId {
+        CompaniesTable.insertAndGetId {
             it[name] = form.name
             it[owner] = form.owner
             it[displayName] = form.displayName ?: form.name
@@ -41,7 +29,7 @@ class CompanyMutationService(
         }
     }
     val update = { form: UpdateCompanyForm ->
-        Companies.update(where = { Companies.id eq form.id }) {
+        CompaniesTable.update(where = { CompaniesTable.id eq form.id }) {
             it[displayName] = form.displayName
             it[website] = form.website
             it[address] = form.address
@@ -51,17 +39,17 @@ class CompanyMutationService(
         form.asMap()
     }
     val delete = { id: UUID ->
-        Companies.deleteWhere {
-            Companies.id eq id
+        CompaniesTable.deleteWhere {
+            CompaniesTable.id eq id
         }.let { mapOf("id" to id) }
     }
     val addOwnerPermissions = { evt: Map<String, *> ->
         val id = evt["id"] as UUID
         val owner = evt["owner"] as String
-        UserPermissions.addPermission(owner, "owner", "company", id.toString())
+        UserPermissionsTable.addPermission(owner, "owner", "company", id.toString())
     }
     val deleteCompanyPermissions = { id: UUID ->
-        UserPermissions.removeByEntityId(id.toString())
+        UserPermissionsTable.removeByEntityId(id.toString())
     }
 
     @Transactional
@@ -89,7 +77,9 @@ class CompanyMutationService(
 
     @Transactional
     fun updateCompany(id: UUID, form: UpdateCompanyForm) = let {
-        val pipeline = validate<UpdateCompanyForm>() thenMapResult
+        val pipeline = validate<UpdateCompanyForm>() andOnResult {
+            println(it)
+        } thenMapResult
                 { it.copy(id = id) } then
                 assure(
                         companyExist,

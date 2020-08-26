@@ -1,8 +1,32 @@
 spring:
+  profiles:
+    active: @active.profile@
+---
+spring:
+  profiles: in-memory
   exposed:
-    generate-ddl: true
+    generate-ddl: false
   datasource:
     url: jdbc:h2:mem:test;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
   h2:
     console:
       enabled: true
+---
+spring:
+  profiles: test
+  exposed:
+    generate-ddl: false
+  datasource:
+    url: jdbc:postgresql://localhost:5432/cashback-db
+    username: cashback
+    password: cashback
+---
+spring:
+  profiles: development
+  exposed:
+    generate-ddl: false
+  datasource:
+    url: jdbc:postgresql://localhost:5432/cashback-db
+    username: cashback
+    password: cashback
+

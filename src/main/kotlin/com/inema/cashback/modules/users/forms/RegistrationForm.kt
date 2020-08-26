@@ -1,5 +1,7 @@
-package com.inema.cashback.modules.users
+package com.inema.cashback.modules.users.forms
 
+import com.inema.cashback.modules.users.UsersTable
+import com.inema.cashback.utils.eqIgnoreCase
 import org.hibernate.validator.constraints.Length
 import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.select
@@ -17,7 +19,7 @@ data class RegistrationForm(
 
     companion object {
         val noUserWithSameNameOrEmail = { form: RegistrationForm ->
-            Users.select { (Users.id eqIgnoreCase form.username) or (Users.email eqIgnoreCase form.email) }.count() == 0L
+            UsersTable.select { (UsersTable.id eqIgnoreCase form.username) or (UsersTable.email eqIgnoreCase form.email) }.count() == 0L
         }
     }
 }
